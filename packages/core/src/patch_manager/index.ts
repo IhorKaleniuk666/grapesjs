@@ -171,7 +171,7 @@ export default class PatchManager extends ItemManagerModule {
       case 'component':
         return em.Components?.getById(id);
       case 'cssRule':
-        return em.Css?.get(id);
+        return em.Css?.rules?.get(id) ?? em.Css?.get(id);
       default:
         return null;
     }

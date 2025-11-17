@@ -24,7 +24,7 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = any> exten
     const rawPatches = diffObjects(before, after);
     if (!rawPatches.length) return this;
 
-    const id = this.id;
+    const id = this.id ?? this.cid;
     const type = this.patchObjectType;
 
     const forward: JsonPatch[] = [];

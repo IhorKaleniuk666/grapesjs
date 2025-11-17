@@ -88,10 +88,9 @@
         height: '100%',
         fromElement: true,
         storageManager: { autoload: 0 },
-       
       });
 
-      // editor.on('patch:update', ({ patch }) => console.log('patch:update', patch));
+      editor.on('patch:update', ({ patch }) => console.log('patch:update', JSON.stringify(patch)));
       editor.on('patch:undo', ({ patch }) => console.log('patch:undo', patch));
       editor.on('patch:redo', ({ patch }) => console.log('patch:redo', patch));
 

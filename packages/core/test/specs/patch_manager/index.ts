@@ -46,6 +46,16 @@ describe('PatchManager', () => {
     expect(updates[0].changes.length).toBeGreaterThanOrEqual(2);
   });
 
+  test('css rule patches include a valid rule identifier', () => {
+    const patches: PatchProps[] = [];
+    editor.on('patch:update', ({ patch }) => patches.push(patch));
+    editor.Css.setIdRule('test-rule', { float: 'left' });
+    const patch = patches[patches.length - 1];
+    expect(patch).toBeDefined();
+    expect(patch?.changes.some((change) => change.path.startsWith('/cssRule/'))).toBe(true);
+    expect(patch?.changes.every((change) => !change.path.includes('/cssRule/undefined'))).toBe(true);
+  });
+
   test('apply() restores recorded patch data', () => {
     let recorded: PatchProps | undefined;
     editor.once('patch:update', ({ patch }) => {
