@@ -1,3 +1,4 @@
+// packages/core/src/dom_components/model/Components.ts
 import { isEmpty, isArray, isString, isFunction, each, includes, extend, flatten, keys } from 'underscore';
 import Component, { SetAttrOptions } from './Component';
 import { AddOptions, Collection } from '../../common';
@@ -18,6 +19,8 @@ import ComponentText from './ComponentText';
 import ComponentWrapper from './ComponentWrapper';
 import { ComponentsEvents, ParseStringOptions } from '../types';
 import { isSymbolInstance, isSymbolRoot, updateSymbolComps } from './SymbolUtils';
+
+import { computeBetween as computeFiBetween, ensureFiForCollection, FI_ATTR } from '../../utils/fractionalIndex';
 
 export interface ResetCommonUpdateProps {
   component: Component;
@@ -144,6 +147,8 @@ Component> {
     this.config = config;
     this.em = em;
     this.domc = opt.domc || em?.Components;
+
+    ensureFiForCollection(this as any);
   }
 
   get events() {

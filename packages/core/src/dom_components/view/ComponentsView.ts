@@ -1,3 +1,4 @@
+// packages/core/src/dom_components/view/ComponentsView.ts
 import { isUndefined } from 'underscore';
 import FrameView from '../../canvas/view/FrameView';
 import { View } from '../../common';
