@@ -1,7 +1,8 @@
 // packages/core/src/dom_components/model/Components.ts
 import { isEmpty, isArray, isString, isFunction, each, includes, extend, flatten, keys } from 'underscore';
 import Component, { SetAttrOptions } from './Component';
-import { AddOptions, Collection } from '../../common';
+import { AddOptions } from '../../common';
+import CollectionWithPatches from '../../domain_abstract/model/CollectionWithPatches';
 import { DomComponentsConfig } from '../config/config';
 import EditorModel from '../../editor/model/Editor';
 import ComponentManager from '..';
@@ -127,7 +128,7 @@ interface AddComponentOptions extends AddOptions {
   keepIds?: string[];
 }
 
-export default class Components extends Collection</**
+export default class Components extends CollectionWithPatches</**
  * Keep this format to avoid errors in TS bundler */
 /** @ts-ignore */
 Component> {
@@ -149,6 +150,7 @@ Component> {
     this.domc = opt.domc || em?.Components;
 
     ensureFiForCollection(this as any);
+    this.rebuildFractionalMap();
   }
 
   get events() {
@@ -371,7 +373,19 @@ Component> {
 
     models = isArray(models) ? flatten(processedModels as any, 1) : processedModels[0];
 
-    return super.add(models as any, opt);
+    const added = super.add(models as any, opt) as Component | Component[] | undefined;
+    if (added) {
+      this.assignFractionalIndexes(added);
+    }
+    return added;
+  }
+
+  protected assignFractionalIndexes(models: Component | Component[]) {
+    const list = Array.isArray(models) ? models : [models];
+    list.forEach((model) => {
+      computeFiBetween(this, model);
+      this.refreshFractionalEntry(model);
+    });
   }
 
   /**

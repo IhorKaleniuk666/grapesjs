@@ -12,18 +12,26 @@ import { ComponentsEvents } from '../types';
 import ComponentView from './ComponentView';
 
 export default class ComponentsView extends View {
+  // ❌ вот это удалить:
+  // declare collection: Components;
+
   opts!: any;
   config!: DomComponentsConfig & { frameView?: FrameView };
   em!: EditorModel;
   parentEl?: HTMLElement;
   compView = ComponentView;
 
+  protected get componentsCollection(): Components {
+    // TS2352 → используем двойной cast через unknown
+    return this.collection as unknown as Components;
+  }
+
   initialize(o: any) {
     this.opts = o || {};
     this.config = o.config || {};
     // @ts-ignore
     this.em = this.config.em;
-    const coll = this.collection;
+    const coll = this.componentsCollection;
     this.listenTo(coll, 'add', this.addTo);
     this.listenTo(coll, 'reset', this.resetChildren);
     this.listenTo(coll, 'remove', this.removeChildren);
@@ -42,26 +50,10 @@ export default class ComponentsView extends View {
     inner.forEach((it) => this.removeChildren(it, coll, opts));
   }
 
-  /**
-   * Add to collection
-   * @param {Model} model
-   * @param {Collection} coll
-   * @param {Object} opts
-   * @private
-   * */
   addTo(model: Component) {
-    this.addToCollection(model, null, this.collection.indexOf(model));
+    this.addToCollection(model, null, this.componentsCollection.indexOf(model));
   }
 
-  /**
-   * Add new object to collection
-   * @param  {Object}  Model
-   * @param  {Object}   Fragment collection
-   * @param  {Integer}  Index of append
-   *
-   * @return   {Object}   Object rendered
-   * @private
-   * */
   addToCollection(model: Component, fragment?: DocumentFragment | null, index?: number) {
     const { config, opts, em } = this;
     const { frameView } = config;
@@ -76,6 +68,7 @@ export default class ComponentsView extends View {
         break;
       }
     }
+
     const view =
       sameFrameView ||
       new viewObject({
@@ -87,7 +80,6 @@ export default class ComponentsView extends View {
     let rendered;
 
     try {
-      // Avoid breaking on DOM rendering (eg. invalid attribute name)
       rendered = view.render().el;
     } catch (error) {
       rendered = document.createTextNode('');
@@ -103,13 +95,10 @@ export default class ComponentsView extends View {
       if (!isUndefined(index)) {
         const lastIndex = children.length == index;
 
-        // If the added model is the last of collection
-        // need to change the logic of append
         if (lastIndex) {
           index--;
         }
 
-        // In case the added is new in the collection index will be -1
         if (lastIndex || !children.length) {
           parent.appendChild(rendered);
         } else {
@@ -135,14 +124,15 @@ export default class ComponentsView extends View {
       this.parentEl!.innerHTML = '';
     }
     previousModels?.forEach((md) => this.removeChildren(md, this.collection));
-    models.each((model) => this.addToCollection(model));
+    models.getFractionalModels().forEach((model) => this.addToCollection(model));
   }
 
   render(parent?: HTMLElement) {
     const el = this.el;
     const frag = document.createDocumentFragment();
     this.parentEl = parent || this.el;
-    this.collection.each((model) => this.addToCollection(model, frag));
+    const components = this.componentsCollection;
+    components.getFractionalModels().forEach((model) => this.addToCollection(model, frag));
     el.innerHTML = '';
     el.appendChild(frag);
     return this;
