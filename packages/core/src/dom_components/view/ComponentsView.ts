@@ -12,9 +12,6 @@ import { ComponentsEvents } from '../types';
 import ComponentView from './ComponentView';
 
 export default class ComponentsView extends View {
-  // ❌ вот это удалить:
-  // declare collection: Components;
-
   opts!: any;
   config!: DomComponentsConfig & { frameView?: FrameView };
   em!: EditorModel;
@@ -22,7 +19,6 @@ export default class ComponentsView extends View {
   compView = ComponentView;
 
   protected get componentsCollection(): Components {
-    // TS2352 → используем двойной cast через unknown
     return this.collection as unknown as Components;
   }
 
@@ -115,7 +111,6 @@ export default class ComponentsView extends View {
 
     return rendered;
   }
-
   resetChildren(models: Components, opts: ResetComponentsOptions = {}) {
     if (opts.skipViewUpdate) return;
 
@@ -124,7 +119,8 @@ export default class ComponentsView extends View {
       this.parentEl!.innerHTML = '';
     }
     previousModels?.forEach((md) => this.removeChildren(md, this.collection));
-    models.getFractionalModels().forEach((model) => this.addToCollection(model));
+
+    (models as any).forEach((model: Component) => this.addToCollection(model));
   }
 
   render(parent?: HTMLElement) {

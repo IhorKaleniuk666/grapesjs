@@ -1,50 +1,26 @@
-// packages/core/src/domain_abstract/model/CollectionWithPatches.ts
-import { Collection, Model, AddOptions, RemoveOptions } from '../../common';
-import { getFi } from '../../utils/fractionalIndex';
+import { Collection, Model } from '../../common';
+import { getFi, FI_STEP, setFi } from '../../utils/fractionalIndex';
 
 export default class CollectionWithPatches<T extends Model = Model> extends Collection<T> {
-  fractionalMap?: Map<string, T>;
-  private fractionalKeys?: Map<string, string>;
+  fractionalMap = new Map<string, T>();
+  private fractionalKeys = new Map<string, string>();
 
   constructor(models?: any, options?: any) {
     super(models, options);
+
     this.rebuildFractionalMap();
-  }
 
-  // ───────────────────────────────────────────────────────────
-  // add: перегрузки такие же, как в Collection<T>
-  // ───────────────────────────────────────────────────────────
-  add(model: {} | T, options?: AddOptions): T;
-  add(models: ({} | T)[], options?: AddOptions): T[];
-  add(models: {} | T | ({} | T)[], options?: AddOptions): T | T[] {
-    const result = super.add(models as any, options) as T | T[] | undefined;
+    this.on('add', (model: T) => {
+      this.addToFractional(model);
+    });
 
-    if (result) {
-      this.addToFractional(result);
-    }
+    this.on('remove', (model: T) => {
+      this.removeFromFractional(model);
+    });
 
-    return result as T | T[];
-  }
-
-  // ───────────────────────────────────────────────────────────
-  // remove: перегрузки такие же, как в Collection<T>
-  // ───────────────────────────────────────────────────────────
-  remove(model: {} | T, options?: RemoveOptions): T;
-  remove(models: ({} | T)[], options?: RemoveOptions): T[];
-  remove(models: {} | T | ({} | T)[], options?: RemoveOptions): T | T[] {
-    const result = super.remove(models as any, options) as T | T[] | undefined;
-
-    if (result) {
-      this.removeFromFractional(result);
-    }
-
-    return result as T | T[];
-  }
-
-  reset(models?: any, options?: any) {
-    const result = super.reset(models, options);
-    this.rebuildFractionalMap();
-    return result;
+    this.on('reset', () => {
+      this.rebuildFractionalMap();
+    });
   }
 
   protected addToFractional(models: T | T[]) {
@@ -52,48 +28,62 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
     list.forEach((model) => this.setFractionalEntry(model));
   }
 
-  protected ensureFractionalStorage() {
-    if (!this.fractionalMap) {
-      this.fractionalMap = new Map<string, T>();
-    }
-    if (!this.fractionalKeys) {
-      this.fractionalKeys = new Map<string, string>();
-    }
-  }
-
   protected removeFromFractional(models: T | T[]) {
     const list = Array.isArray(models) ? models : [models];
     list.forEach((model) => {
-      this.ensureFractionalStorage();
-      const key = this.fractionalKeys?.get(model.cid);
+      const key = this.fractionalKeys.get(model.cid);
       if (key) {
-        this.fractionalMap?.delete(key);
-        this.fractionalKeys?.delete(model.cid);
+        this.fractionalMap.delete(key);
+        this.fractionalKeys.delete(model.cid);
       }
     });
   }
 
   protected rebuildFractionalMap() {
-    this.ensureFractionalStorage();
-    this.fractionalMap!.clear();
-    this.fractionalKeys!.clear();
+    this.fractionalMap.clear();
+    this.fractionalKeys.clear();
+
+    // Проверяем, что fiIndex'ы нормальные
+    let needsNormalize = false;
+    let lastFi: number | undefined;
+
+    this.models.forEach((m) => {
+      const fi = getFi(m as any);
+      if (typeof fi !== 'number') {
+        needsNormalize = true;
+        return;
+      }
+      if (lastFi != null && fi <= lastFi) {
+        needsNormalize = true;
+        return;
+      }
+      lastFi = fi;
+    });
+
+    // Если что-то странное — переиндексируем по текущему порядку
+    if (needsNormalize) {
+      this.models.forEach((m, idx) => {
+        setFi(m as any, idx * FI_STEP);
+      });
+    }
+
+    // И только потом строим карту
     this.models.forEach((model) => this.setFractionalEntry(model as T));
   }
 
   protected getFractionalKey(model: T) {
     const fi = getFi(model as any);
-    return typeof fi === 'number' ? `${fi}` : model.cid;
+    return typeof fi === 'number' ? `${fi}` : (model as any).cid;
   }
 
   protected setFractionalEntry(model: T) {
     const key = this.getFractionalKey(model);
-    const prevKey = this.fractionalKeys?.get(model.cid);
+    const prevKey = this.fractionalKeys.get(model.cid);
     if (prevKey && prevKey !== key) {
-      this.fractionalMap?.delete(prevKey);
+      this.fractionalMap.delete(prevKey);
     }
-    this.ensureFractionalStorage();
-    this.fractionalKeys!.set(model.cid, key);
-    this.fractionalMap!.set(key, model);
+    this.fractionalKeys.set(model.cid, key);
+    this.fractionalMap.set(key, model);
   }
 
   refreshFractionalEntry(model: T) {
@@ -102,7 +92,7 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
 
   getAndSortFractionalMap() {
     const entries: [string, T][] = [];
-    this.fractionalMap?.forEach((value, key) => entries.push([key, value]));
+    this.fractionalMap.forEach((value, key) => entries.push([key, value]));
     entries.sort(([aKey], [bKey]) => {
       const a = Number(aKey);
       const b = Number(bKey);
@@ -125,6 +115,6 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
   }
 
   getFractionalKeyByCid(cid: string) {
-    return this.fractionalKeys?.get(cid);
+    return this.fractionalKeys.get(cid);
   }
 }

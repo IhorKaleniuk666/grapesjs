@@ -193,8 +193,22 @@ export default class CommandsModule extends Module<CommandsConfig & { pStylePref
     };
 
     // Core commands
-    defaultCommands['core:undo'] = (e) => e.UndoManager.undo();
-    defaultCommands['core:redo'] = (e) => e.UndoManager.redo();
+    defaultCommands['core:undo'] = (e) => {
+      const patches = e.Patches;
+      if (patches?.isEnabled) {
+        patches.undo();
+      } else {
+        e.UndoManager.undo();
+      }
+    };
+    defaultCommands['core:redo'] = (e) => {
+      const patches = e.Patches;
+      if (patches?.isEnabled) {
+        patches.redo();
+      } else {
+        e.UndoManager.redo();
+      }
+    };
     commandsDef.forEach((item) => {
       const oldCmd = item[2];
       const cmd = require(`./view/${item[1]}`).default;

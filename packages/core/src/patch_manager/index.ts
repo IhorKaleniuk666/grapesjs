@@ -47,6 +47,7 @@ export default class PatchManager extends ItemManagerModule {
   endBatch() {
     if (!this.isEnabled || !this.active) return;
     const patch = this.active;
+    console.log('endBatch: ', this.active);
     this.active = null;
     if (patch.changes.length === 0 && patch.reverseChanges.length === 0) return;
 
@@ -68,9 +69,12 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   update(fn: () => void, meta?: Record<string, any>) {
-    if (!this.isEnabled) return fn();
+    if (!this.isEnabled || this.isApplyingExternal) return fn();
+
     const alreadyActive = !!this.active;
+
     if (!alreadyActive) this.beginBatch(meta);
+
     try {
       fn();
     } finally {
@@ -86,7 +90,8 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   collect(changes: JsonPatch[], inverse: JsonPatch[]) {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled || this.isApplyingExternal) return;
+
     const startedHere = !this.active;
     if (startedHere) this.beginBatch();
     this.active!.changes.push(...changes);
@@ -117,7 +122,10 @@ export default class PatchManager extends ItemManagerModule {
 
   undo() {
     if (!this.isEnabled || this.index < 0) return;
+    console.log('this.index: ', this.index);
     const patch = this.history[this.index];
+
+    console.log('patch: ', patch.reverseChanges);
     this.isApplyingExternal = true;
     try {
       this.applyJsonPatchList(patch.reverseChanges);
@@ -184,19 +192,25 @@ export default class PatchManager extends ItemManagerModule {
       } else {
         const leafKey = path[path.length - 1];
         const baseKeys = path.slice(0, -1);
-        let subtree = target.get(baseKeys.join('.')) ?? target.get(baseKeys[0]) ?? {};
-        subtree = { ...subtree };
-        let ref = subtree as any;
+        const baseKeyPath = baseKeys.join('.');
+        let subtree = target.get(baseKeyPath) ?? target.get(baseKeys[0]) ?? {};
+        const clone = Array.isArray(subtree) ? [...subtree] : { ...subtree };
+        let ref = clone as any;
         for (let i = 0; i < baseKeys.length - 1; i++) {
           const k = baseKeys[i + 1];
-          ref[k] = ref[k] ?? {};
+          const next = ref[k];
+          if (next && typeof next === 'object') {
+            ref[k] = Array.isArray(next) ? [...next] : { ...next };
+          } else if (typeof next === 'undefined') {
+            ref[k] = {};
+          }
           ref = ref[k];
         }
         ref[leafKey] = value;
         if (baseKeys.length > 1) {
-          target.set(baseKeys.join('.'), subtree);
+          target.set(baseKeyPath, clone);
         } else {
-          target.set(baseKeys[0], subtree);
+          target.set(baseKeys[0], clone);
         }
       }
       return;
