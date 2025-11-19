@@ -5,39 +5,34 @@ import type { JsonPatch } from '../../utils/jsonDiff';
 import { diffObjects } from '../../utils/jsonDiff';
 
 export default class ModelWithPatches<T extends ObjectHash = any, S = any> extends Model<T, S> {
-  patchObjectType = ''; // 'component' | 'cssRule' ...
+  patchObjectType = '';
 
   set(key: any, val?: any, opts?: any) {
     const { em } = this as any;
     const P = em?.Patches;
 
-    // Нормализуем вход сразу, чтобы можно было смотреть options
     const props = typeof key === 'string' ? { [key]: val } : key;
     const options = typeof key === 'string' ? opts || {} : val || {};
 
-    // Условия, когда ПАТЧИ НЕ НУЖНЫ вообще
     if (
-      !P?.isEnabled || // менеджер патчей выключен
-      (P as any)['isApplyingExternal'] || // сейчас выполняется undo/redo/apply
-      options.fromUndo || // спец-операции из UndoManager/внутренние
-      options.noUndo || // пометка "не писать в историю"
-      options.avoidStore || // то же по смыслу
-      options._skipPatches // наш потенциальный escape-хук
+      !P?.isEnabled ||
+      (P as any)['isApplyingExternal'] ||
+      options.fromUndo ||
+      options.noUndo ||
+      options.avoidStore ||
+      options._skipPatches
     ) {
       return super.set(props, options);
     }
 
-    // Ключи, которые реально меняем (например, 'style', 'attributes' и т.д.)
     const keys = Object.keys(props || {});
     if (!keys.length) {
       return super.set(props, options);
     }
 
-    // ---------- BEFORE ----------
     const before: any = {};
     let jsonBefore: any;
 
-    // Пытаемся использовать toJSON, но если модель ещё "сырая" — откатываемся на attributes
     try {
       jsonBefore = this.toJSON();
     } catch {
@@ -48,10 +43,8 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = any> exten
       before[k] = jsonBefore?.[k];
     });
 
-    // Применяем реальное изменение
     super.set(props, options);
 
-    // ---------- AFTER ----------
     const after: any = {};
     let jsonAfter: any;
 
@@ -65,7 +58,6 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = any> exten
       after[k] = jsonAfter?.[k];
     });
 
-    // Считаем diff ТОЛЬКО по изменённым ключам
     const rawPatches = diffObjects(before, after);
     if (!rawPatches.length) return this;
 

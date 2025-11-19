@@ -1,11 +1,9 @@
-// src/utils/jsonDiff.ts
 export interface JsonPatch {
   op: 'add' | 'remove' | 'replace';
   path: string;
   value?: any;
 }
 
-/** Порівняти два прості об'єкти та створити масив JSON Patch */
 export function diffObjects(before: any, after: any, basePath = ''): JsonPatch[] {
   const patches: JsonPatch[] = [];
 

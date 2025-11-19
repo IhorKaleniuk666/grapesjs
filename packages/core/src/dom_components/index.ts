@@ -432,7 +432,7 @@ export default class ComponentManager extends ItemManagerModule<DomComponentsCon
     // Load dependencies
     if (em) {
       em.get('Parser').compTypes = this.componentTypes;
-      em.on('change:componentHovered', this.componentHovered, this);
+      // em.on('change:componentHovered', this.componentHovered, this);
 
       const selected = em.get('selected');
       em.listenTo(selected, 'add', (sel, c, opts) => this.selectAdd(selected.getComponent(sel), opts));
