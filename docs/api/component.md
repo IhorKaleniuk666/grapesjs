@@ -760,6 +760,12 @@ Return the component id
 
 Returns **[String][1]**&#x20;
 
+## getComponentId
+
+Return the internal component id used for editor bookkeeping
+
+Returns **[string][1]**&#x20;
+
 ## setId
 
 Set new id on the component

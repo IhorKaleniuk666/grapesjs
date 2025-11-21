@@ -1,4 +1,3 @@
-// src/patch_manager/PatchManager.ts
 import { genId } from '../utils/id';
 import type { PatchManagerConfig, PatchProps, JsonPatch } from './types';
 import { ItemManagerModule } from '../abstract/Module';
@@ -17,6 +16,15 @@ export default class PatchManager extends ItemManagerModule {
   private coalesceMs = 0;
   private maxHistory = 500;
   private isApplyingExternal = false;
+
+  private internalSetOptions = {
+    fromUndo: true,
+    noUndo: true,
+    avoidStore: true,
+    _skipPatches: true,
+  };
+
+  private static blockedRootKeys = new Set<string>(['traits', '__data_values', 'docEl', 'head', 'toolbar']);
 
   constructor(em: EditorModel) {
     super(em, 'Patches', new Collection(), undefined, undefined, { skipListen: true });
@@ -47,7 +55,7 @@ export default class PatchManager extends ItemManagerModule {
   endBatch() {
     if (!this.isEnabled || !this.active) return;
     const patch = this.active;
-    console.log('endBatch: ', this.active);
+    
     this.active = null;
     if (patch.changes.length === 0 && patch.reverseChanges.length === 0) return;
 
@@ -150,12 +158,21 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   private applyJsonPatchList(list: JsonPatch[]) {
-    for (const p of list) this.applyJsonPatch(p);
+    for (const p of list) {
+      try {
+        this.applyJsonPatch(p);
+      } catch (e) {
+        if (this.debug) {
+          this.logWithEditor('apply error', { patch: p } as any);
+        }
+      }
+    }
   }
 
   private applyJsonPatch(p: JsonPatch) {
     const seg = p.path.split('/').filter(Boolean);
     const [objectType, objectId, ...rest] = seg;
+    if (!objectType || !objectId) return;
     const target = this.resolveTarget(objectType, objectId);
     if (!target) return;
 
@@ -185,10 +202,19 @@ export default class PatchManager extends ItemManagerModule {
     }
   }
 
+  private isBlockedRootKey(key?: string) {
+    if (!key) return false;
+    return PatchManager.blockedRootKeys.has(key);
+  }
+
   private setByPath(target: any, path: string[], value: any) {
+    if (!target || !path.length) return;
+    const rootKey = path[0];
+    if (this.isBlockedRootKey(rootKey)) return;
+
     if (typeof target.set === 'function') {
       if (path.length === 1) {
-        target.set(path[0], value);
+        target.set({ [rootKey]: value }, this.internalSetOptions);
       } else {
         const leafKey = path[path.length - 1];
         const baseKeys = path.slice(0, -1);
@@ -208,9 +234,9 @@ export default class PatchManager extends ItemManagerModule {
         }
         ref[leafKey] = value;
         if (baseKeys.length > 1) {
-          target.set(baseKeyPath, clone);
+          target.set(baseKeyPath, clone, this.internalSetOptions);
         } else {
-          target.set(baseKeys[0], clone);
+          target.set(baseKeys[0], clone, this.internalSetOptions);
         }
       }
       return;
@@ -218,27 +244,34 @@ export default class PatchManager extends ItemManagerModule {
 
     let ref = target as any;
     for (let i = 0; i < path.length - 1; i++) {
-      ref = ref[path[i]] ?? (ref[path[i]] = {});
+      const key = path[i];
+      if (ref[key] == null || typeof ref[key] !== 'object') {
+        ref[key] = {};
+      }
+      ref = ref[key];
     }
     ref[path[path.length - 1]] = value;
   }
 
   private deleteByPath(target: any, path: string[]) {
+    if (!target || !path.length) return;
+    const rootKey = path[0];
+    if (this.isBlockedRootKey(rootKey)) return;
+
     if (typeof target.unset === 'function' && path.length === 1) {
-      target.unset(path[0]);
+      target.unset(rootKey, this.internalSetOptions);
       return;
     }
     let ref = target as any;
     for (let i = 0; i < path.length - 1; i++) {
-      if (!ref[path[i]]) return;
-      ref = ref[path[i]];
+      const key = path[i];
+      if (!ref[key] || typeof ref[key] !== 'object') return;
+      ref = ref[key];
     }
     delete ref[path[path.length - 1]];
   }
 
-  private handleMove(_target: any, _seg: string[], _p: JsonPatch) {
-    // TODO: implement once fractional indexing is introduced
-  }
+  private handleMove(_target: any, _seg: string[], _p: JsonPatch) {}
 
   destroy(): void {
     try {
@@ -250,6 +283,7 @@ export default class PatchManager extends ItemManagerModule {
     this.isApplyingExternal = false;
     super.__destroy?.();
   }
+
   private logWithEditor(eventName: string, patch: PatchProps) {
     try {
       this.em.log(`[Patches] ${eventName}`, {

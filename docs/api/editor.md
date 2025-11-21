@@ -18,6 +18,24 @@ const editor = grapesjs.init({
 editor.on('update', () => { ... });
 ```
 
+* `patch:update` Event triggered when the patch manager produces a new JSON patch with the recorded changes.
+
+```javascript
+editor.on('patch:update', ({ patch }) => { ... });
+```
+
+* `patch:undo` Patch manager undo executed.
+
+```javascript
+editor.on('patch:undo', ({ patch }) => { ... });
+```
+
+* `patch:redo` Patch manager redo executed.
+
+```javascript
+editor.on('patch:redo', ({ patch }) => { ... });
+```
+
 * `undo` Undo executed.
 
 ```javascript
