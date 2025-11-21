@@ -2,10 +2,9 @@
 import type Components from '../dom_components/model/Components';
 import type Component from '../dom_components/model/Component';
 
-export const FI_ATTR = 'fiIndex'; // можно оставить для отладки, но больше не использовать напрямую
+export const FI_ATTR = 'fiIndex';
 export const FI_STEP = 1024;
 
-// 👇 внутреннее хранилище индексов, НЕ в атрибутах модели
 const fiStore = new WeakMap<Component, number>();
 
 export const getFi = (cmp?: Component | null): number | undefined => {

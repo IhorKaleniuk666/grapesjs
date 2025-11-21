@@ -1,6 +1,5 @@
 // src/utils/id.ts
 export function genId(): string {
-  // 1) Современный стандарт
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   if (typeof globalThis?.crypto?.randomUUID === 'function') {
@@ -8,7 +7,6 @@ export function genId(): string {
     return globalThis.crypto.randomUUID();
   }
 
-  // 2) Браузеры без randomUUID, но с getRandomValues
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   const c = globalThis?.crypto;
@@ -32,7 +30,6 @@ export function genId(): string {
     );
   }
 
-  // 3) Фолбэк (не криптостойкий, но стабильный)
   const rnd = () =>
     Math.floor((1 + Math.random()) * 0x10000)
       .toString(16)

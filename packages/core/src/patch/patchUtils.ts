@@ -5,8 +5,6 @@ export type JsonPatch = { op: JsonOp; path: string; value?: any };
 export const makeCmpPath = (type: string, id: string) => `/${type}/${id}`;
 
 export function ensurePatchObjectType(model: any): string {
-  // Можеш зберігати тип у моделі (аналог patchObjectType)
-  // або вивести з класу/namespace; поки що ставимо 'component'
   return (model.patchObjectType as string) || 'component';
 }
 
@@ -22,12 +20,10 @@ export function toPropPath(base: string, key: string) {
   return `${base}/${escapeJsonPointer(key)}`;
 }
 
-/** JSON Pointer escaping for ~ and / */
 export function escapeJsonPointer(s: string) {
   return s.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
-/** Збірка forward/reverse патчів для заміни значення */
 export function replacePair(path: string, prevVal: any, nextVal: any): { f: JsonPatch; r: JsonPatch } {
   const f: JsonPatch =
     nextVal === undefined
@@ -38,7 +34,7 @@ export function replacePair(path: string, prevVal: any, nextVal: any): { f: Json
 
   const r: JsonPatch =
     prevVal === undefined
-      ? { op: 'remove', path } // reverse для add → remove
+      ? { op: 'remove', path }
       : nextVal === undefined
         ? { op: 'add', path, value: prevVal }
         : { op: 'replace', path, value: prevVal };
