@@ -98,6 +98,7 @@ const { CSS } = hasWin() ? window : {};
  */
 export default class CssRule extends StyleableModel<CssRuleProperties> {
   patchObjectType = 'cssRule';
+  patchTrackedKeys = ['style', 'selectors', 'name', 'atRuleType', 'atRuleParams'];
   config: CssRuleProperties;
   em?: EditorModel;
   opt: any;

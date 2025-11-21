@@ -238,6 +238,9 @@ importers:
       html-entities:
         specifier: ~1.4.0
         version: 1.4.0
+      immer:
+        specifier: 10.2.0
+        version: 10.2.0
       promise-polyfill:
         specifier: 8.3.0
         version: 8.3.0
@@ -4730,6 +4733,9 @@ packages:
 
   immediate@3.3.0:
     resolution: {integrity: sha512-HR7EVodfFUdQCTIeySw+WDRFJlPcLOJbXfwwZ7Oom6tjsvZ3bOkCDJHehQC3nxJrv7+f9XecwazynjU8e4Vw3Q==}
+
+  immer@10.2.0:
+    resolution: {integrity: sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw==}
 
   immutable@4.3.7:
     resolution: {integrity: sha512-1hqclzwYwjRDFLjcFxOM5AYkkG0rpFPpr1RLPMEuGczoS7YA8gLhy8SWXYRAA/XwfEHpfo3cw5JGioS32fnMRw==}
@@ -10748,7 +10754,7 @@ snapshots:
       toml: 3.0.0
       url-loader: 1.1.2(webpack@4.47.0)
       vue: 2.7.16
-      vue-loader: 15.11.1(@vue/compiler-sfc@3.5.12)(cache-loader@3.0.1(webpack@4.47.0))(css-loader@2.1.1(webpack@4.0.0))(ejs@3.1.10)(hogan.js@3.0.2)(lodash@4.17.21)(prettier@3.3.3)(underscore@1.13.1)(vue-template-compiler@2.7.16)(webpack@4.47.0)
+      vue-loader: 15.11.1(@vue/compiler-sfc@3.5.12)(cache-loader@3.0.1(webpack@4.47.0))(css-loader@2.1.1(webpack@4.47.0))(ejs@3.1.10)(hogan.js@3.0.2)(lodash@4.17.21)(prettier@3.3.3)(underscore@1.13.1)(vue-template-compiler@2.7.16)(webpack@4.47.0)
       vue-router: 3.6.5(vue@2.7.16)
       vue-server-renderer: 2.7.16
       vue-template-compiler: 2.7.16
@@ -14437,6 +14443,8 @@ snapshots:
   ignore@5.3.2: {}
 
   immediate@3.3.0: {}
+
+  immer@10.2.0: {}
 
   immutable@4.3.7: {}
 
@@ -18760,7 +18768,7 @@ snapshots:
 
   vue-hot-reload-api@2.3.4: {}
 
-  vue-loader@15.11.1(@vue/compiler-sfc@3.5.12)(cache-loader@3.0.1(webpack@4.47.0))(css-loader@2.1.1(webpack@4.0.0))(ejs@3.1.10)(hogan.js@3.0.2)(lodash@4.17.21)(prettier@3.3.3)(underscore@1.13.1)(vue-template-compiler@2.7.16)(webpack@4.47.0):
+  vue-loader@15.11.1(@vue/compiler-sfc@3.5.12)(cache-loader@3.0.1(webpack@4.47.0))(css-loader@2.1.1(webpack@4.47.0))(ejs@3.1.10)(hogan.js@3.0.2)(lodash@4.17.21)(prettier@3.3.3)(underscore@1.13.1)(vue-template-compiler@2.7.16)(webpack@4.47.0):
     dependencies:
       '@vue/component-compiler-utils': 3.3.0(ejs@3.1.10)(hogan.js@3.0.2)(lodash@4.17.21)(underscore@1.13.1)
       css-loader: 2.1.1(webpack@4.47.0)

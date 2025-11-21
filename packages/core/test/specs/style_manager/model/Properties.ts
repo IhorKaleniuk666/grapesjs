@@ -212,7 +212,7 @@ describe('StyleManager properties logic', () => {
     });
 
     test('Custom fromStyle', () => {
-      compTypeProp.set('fromStyle', (style, { separator }) => {
+      compTypeProp.set('fromStyle', (style: { [x: string]: string }, { separator }: any) => {
         const values = (style[propTest] as string).split(separator);
         return {
           [propATest]: values[0],
@@ -388,7 +388,7 @@ describe('StyleManager properties logic', () => {
     test('getStyleFromProps with custom toStyle', () => {
       rule1.setStyle({ padding: '1px 2px 3px 4px' });
       obj.__upSel();
-      compTypeProp.set('toStyle', (values) => {
+      compTypeProp.set('toStyle', (values: { [x: string]: any }) => {
         return {
           [propTest]: `rgba(${values[propATestId]}, ${values[propBTestId]}, ${values[propDTestId]})`,
         };
@@ -528,7 +528,7 @@ describe('StyleManager properties logic', () => {
     });
 
     test('Custom fromStyle', () => {
-      compTypeProp.set('fromStyle', (style, { separatorLayers }) => {
+      compTypeProp.set('fromStyle', (style: Record<string, any>, { separatorLayers }: { separatorLayers: string }) => {
         const layerValues = (style[propTest] as string).split(separatorLayers);
         return layerValues.map((value) => ({ value }));
       });
@@ -566,7 +566,7 @@ describe('StyleManager properties logic', () => {
     });
 
     test('Custom toStyle', () => {
-      compTypeProp.set('toStyle', (values) => {
+      compTypeProp.set('toStyle', (values: { [x: string]: any }) => {
         return {
           [propTest]: `rgba(${values[propATest]}, ${values[propBTest]}, ${values[propCTest]})`,
         };

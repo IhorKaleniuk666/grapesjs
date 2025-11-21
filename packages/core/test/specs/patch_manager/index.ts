@@ -89,4 +89,36 @@ describe('PatchManager', () => {
       expect(wrapper.get('tagName')).toBe('section');
       expect(redo).toHaveLength(1);
     });
+
+  test('reorder collects move patches and keeps order on undo/redo', () => {
+    const pm = editor.Patches as any;
+    pm.history = [];
+    pm.index = -1;
+    pm.active = null;
+
+    const wrapper = editor.getWrapper()!;
+    const first = wrapper.append({ type: 'text', content: 'first' })[0];
+    const second = wrapper.append({ type: 'text', content: 'second' })[0];
+    const third = wrapper.append({ type: 'text', content: 'third' })[0];
+
+    pm.history = [];
+    pm.index = -1;
+    pm.active = null;
+
+    const patches: PatchProps[] = [];
+    editor.on('patch:update', ({ patch }) => patches.push(patch));
+
+    third.move(wrapper, { at: 0 });
+    const movePatch = patches[patches.length - 1];
+    expect(movePatch?.changes.some((c) => c.op === 'move')).toBe(true);
+    expect(wrapper.components().at(0)).toBe(third);
+
+    editor.Patches.undo();
+    expect(wrapper.components().at(2)).toBe(third);
+    editor.Patches.redo();
+    expect(wrapper.components().at(0)).toBe(third);
+    // Ensure other children stay consistent
+    expect(wrapper.components().at(1)).toBe(first);
+    expect(wrapper.components().at(2)).toBe(second);
+  });
 });

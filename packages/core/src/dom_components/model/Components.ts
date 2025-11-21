@@ -354,11 +354,7 @@ Component> {
 
     models = isArray(models) ? flatten(processedModels as any, 1) : processedModels[0];
 
-    const added = super.add(models as any, opt) as Component | Component[] | undefined;
-    if (added) {
-      this.assignFractionalIndexes(added);
-    }
-    return added;
+    return super.add(models as any, opt) as Component | Component[] | undefined;
   }
 
   protected assignFractionalIndexes(models: Component | Component[]) {

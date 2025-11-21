@@ -155,6 +155,9 @@ type GetComponentStyleOpts = GetStyleOpts & {
  */
 export default class Component extends StyleableModel<ComponentProperties> {
   patchObjectType = 'component';
+
+  patchIgnoredKeys = ['status', 'open', 'toolbar', 'traits', 'scriptUpdated'];
+
   /**
    * @private
    * @ts-ignore */

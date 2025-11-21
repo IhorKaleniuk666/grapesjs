@@ -92,7 +92,7 @@ describe('Sectors', () => {
       em.setSelected(cmp);
 
       s2.getProperty('color')?.set({
-        isVisible: ({ component }) => component?.tagName !== 'span',
+        isVisible: ({ component }: { component?: { tagName?: string } | null }) => component?.tagName !== 'span',
       });
 
       sm.__upSel();

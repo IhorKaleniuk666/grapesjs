@@ -3,11 +3,13 @@ import type { PatchManagerConfig, PatchProps, JsonPatch } from './types';
 import { ItemManagerModule } from '../abstract/Module';
 import { Collection } from '../common';
 import type EditorModel from '../editor/model/Editor';
+import { EditorEvents } from '../editor/types';
 
 export default class PatchManager extends ItemManagerModule {
   storageKey = '';
   isEnabled = false;
   private debug = false;
+  private isReady = false;
 
   private history: PatchProps[] = [];
   private index = -1;
@@ -34,6 +36,7 @@ export default class PatchManager extends ItemManagerModule {
     const cfg = (this.getConfig() as any) ?? {};
     const normalized = typeof cfg === 'boolean' ? { enable: cfg } : cfg;
     this.init({ enable: true, ...normalized });
+    this.setupTracking();
   }
 
   init(cfg: PatchManagerConfig = {}) {
@@ -44,8 +47,38 @@ export default class PatchManager extends ItemManagerModule {
     return this;
   }
 
+  private setupTracking() {
+    const { em } = this;
+    this.isReady = !!em.get('readyLoad');
+    em.on('change:readyLoad', this.handleReadyLoad);
+    em.on(EditorEvents.projectLoad, this.handleProjectLoad);
+  }
+
+  private handleReadyLoad = () => {
+    if (!this.em.get('readyLoad')) return;
+    this.isReady = true;
+    this.resetHistory();
+    this.em.off('change:readyLoad', this.handleReadyLoad);
+  };
+
+  private handleProjectLoad = () => {
+    this.resetHistory();
+  };
+
+  private resetHistory() {
+    this.coalesceTimer && clearTimeout(this.coalesceTimer);
+    this.coalesceTimer = undefined;
+    this.active = null;
+    this.history = [];
+    this.index = -1;
+  }
+
+  canTrack() {
+    return this.isEnabled && this.isReady && !this.isApplyingExternal;
+  }
+
   beginBatch(meta?: Record<string, any>) {
-    if (!this.isEnabled) return;
+    if (!this.canTrack()) return;
     if (!this.active) {
       this.active = { id: genId(), ts: Date.now(), changes: [], reverseChanges: [], meta };
       this.em.trigger('patch:batch:start', this.active);
@@ -53,9 +86,9 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   endBatch() {
-    if (!this.isEnabled || !this.active) return;
+    if (!this.canTrack() || !this.active) return;
     const patch = this.active;
-    
+
     this.active = null;
     if (patch.changes.length === 0 && patch.reverseChanges.length === 0) return;
 
@@ -77,7 +110,7 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   update(fn: () => void, meta?: Record<string, any>) {
-    if (!this.isEnabled || this.isApplyingExternal) return fn();
+    if (!this.canTrack()) return fn();
 
     const alreadyActive = !!this.active;
 
@@ -98,7 +131,7 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   collect(changes: JsonPatch[], inverse: JsonPatch[]) {
-    if (!this.isEnabled || this.isApplyingExternal) return;
+    if (!this.canTrack()) return;
 
     const startedHere = !this.active;
     if (startedHere) this.beginBatch();
@@ -129,11 +162,9 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   undo() {
-    if (!this.isEnabled || this.index < 0) return;
-    console.log('this.index: ', this.index);
+    if (!this.canTrack() || this.index < 0) return;
     const patch = this.history[this.index];
 
-    console.log('patch: ', patch.reverseChanges);
     this.isApplyingExternal = true;
     try {
       this.applyJsonPatchList(patch.reverseChanges);
@@ -145,7 +176,7 @@ export default class PatchManager extends ItemManagerModule {
   }
 
   redo() {
-    if (!this.isEnabled || this.index >= this.history.length - 1) return;
+    if (!this.canTrack() || this.index >= this.history.length - 1) return;
     const patch = this.history[this.index + 1];
     this.isApplyingExternal = true;
     try {
@@ -176,6 +207,10 @@ export default class PatchManager extends ItemManagerModule {
     const target = this.resolveTarget(objectType, objectId);
     if (!target) return;
 
+    if (rest[0] === 'components' && this.applyComponentsPatch(target, rest.slice(1), p)) {
+      return;
+    }
+
     switch (p.op) {
       case 'add':
       case 'replace':
@@ -188,6 +223,82 @@ export default class PatchManager extends ItemManagerModule {
         this.handleMove(target, seg, p);
         break;
     }
+  }
+
+  private applyComponentsPatch(target: any, path: string[], patch: JsonPatch) {
+    const coll = this.getComponentsCollection(target);
+    if (!coll) return false;
+    const [key] = path;
+    if (!key) return false;
+
+    switch (patch.op) {
+      case 'remove': {
+        const model = this.findComponentByKey(coll, key);
+        model && coll.remove(model, { ...this.internalSetOptions });
+        return true;
+      }
+      case 'add':
+      case 'replace': {
+        const index = this.resolveComponentIndex(coll, key);
+        const opts = { ...this.internalSetOptions, at: index };
+        const existing = this.findComponentByKey(coll, key);
+        existing && coll.remove(existing, opts);
+        if (patch.value) {
+          const added = coll.add(patch.value as any, opts);
+          const list = Array.isArray(added) ? added : [added];
+          list.forEach((m) => coll.setFractionalKey?.(m, key));
+        }
+        return true;
+      }
+      case 'move': {
+        return this.applyComponentsMove(coll, key, patch);
+      }
+      default:
+        return false;
+    }
+  }
+
+  private getComponentsCollection(target: any) {
+    return typeof target?.components === 'function' ? target.components() : null;
+  }
+
+  private findComponentByKey(coll: any, key: string) {
+    if (!coll) return null;
+    if (typeof coll.findByFractionalKey === 'function') {
+      return coll.findByFractionalKey(key);
+    }
+    const idx = Number(key);
+    return Number.isNaN(idx) ? null : coll.at(idx);
+  }
+
+  private resolveComponentIndex(coll: any, key: string) {
+    if (typeof coll.getIndexFromFractionalKey === 'function') {
+      return coll.getIndexFromFractionalKey(key);
+    }
+    const idx = Number(key);
+    return Number.isNaN(idx) ? coll.length : idx;
+  }
+
+  private applyComponentsMove(coll: any, key: string, patch: JsonPatch) {
+    if (!patch.from) return false;
+    const fromSeg = patch.from.split('/').filter(Boolean);
+    const [fromType, fromId, fromLabel, fromKey] = fromSeg;
+    if (fromLabel !== 'components' || !fromType || !fromId || !fromKey) return false;
+
+    const fromTarget = this.resolveTarget(fromType, fromId);
+    const fromColl = this.getComponentsCollection(fromTarget);
+    if (!fromColl) return false;
+
+    const model = this.findComponentByKey(fromColl, fromKey);
+    if (!model) return false;
+
+    fromColl.remove(model, { ...this.internalSetOptions, temporary: true });
+
+    const at = this.resolveComponentIndex(coll, key);
+    const added = coll.add(model, { ...this.internalSetOptions, at });
+    const list = Array.isArray(added) ? added : [added];
+    list.forEach((m) => coll.setFractionalKey?.(m, key));
+    return true;
   }
 
   private resolveTarget(type: string, id: string): any {
@@ -274,12 +385,9 @@ export default class PatchManager extends ItemManagerModule {
   private handleMove(_target: any, _seg: string[], _p: JsonPatch) {}
 
   destroy(): void {
-    try {
-      if (this.coalesceTimer) clearTimeout(this.coalesceTimer);
-    } catch {}
-    this.active = null;
-    this.history = [];
-    this.index = -1;
+    this.em?.off('change:readyLoad', this.handleReadyLoad);
+    this.em?.off(EditorEvents.projectLoad, this.handleProjectLoad);
+    this.resetHistory();
     this.isApplyingExternal = false;
     super.__destroy?.();
   }

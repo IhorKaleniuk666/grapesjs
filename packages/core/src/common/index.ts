@@ -1,5 +1,6 @@
 import Backbone from 'backbone';
 import { HTMLParserOptions } from '../parser/config/config';
+import ModelWithPatches from '../domain_abstract/model/ModelWithPatches';
 export { default as $ } from '../utils/cash-dom';
 
 interface NOOP {}
@@ -78,7 +79,7 @@ export type CombinedModelConstructorOptions<
 export interface ViewOptions<TModel extends Model | undefined = Model, TElement extends Element = HTMLElement>
   extends Backbone.ViewOptions<TModel, TElement> {}
 
-export class Model<T extends ObjectHash = any, S = SetOptions, E = any> extends Backbone.Model<T, S, E> {}
+export class Model<T extends ObjectHash = any, S = SetOptions, E = any> extends ModelWithPatches<T, S, E> {}
 
 export class Collection<T extends Model = Model> extends Backbone.Collection<T> {}
 

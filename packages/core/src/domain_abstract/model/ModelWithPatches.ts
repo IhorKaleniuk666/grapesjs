@@ -1,33 +1,91 @@
-import { Model, ObjectHash } from '../../common';
-import { getPrevValue } from '../../helpers/getPrevValue';
-import type { JsonPatch } from '../../utils/jsonDiff';
-import { diffObjects } from '../../utils/jsonDiff';
+// src/domain_abstract/model/ModelWithPatches.ts
+import Backbone from 'backbone';
+import { enablePatches, produceWithPatches, Patch as ImmerPatch } from 'immer';
+import type { JsonPatch } from '../../patch_manager/types';
 
-const PATCH_PATH_BLACKLIST = [/^\/traits\b/, /^\/__data_values\b/, /^\/docEl\b/, /^\/head\b/, /^\/toolbar\b/];
+enablePatches();
 
-function isBlacklistedPath(path: string) {
-  return PATCH_PATH_BLACKLIST.some((rx) => rx.test(path));
-}
+const PATCH_PATH_BLACKLIST = [
+  /^\/traits\b/,
+  /^\/__data_values\b/,
+  /^\/docEl\b/,
+  /^\/head\b/,
+  /^\/toolbar\b/,
+  /^\/selectors\b/,
+];
 
-export default class ModelWithPatches<T extends ObjectHash = any, S = any> extends Model<T, S> {
+const isBlacklistedPath = (path: string) => PATCH_PATH_BLACKLIST.some((rx) => rx.test(path));
+
+const snapshotModel = (model: any) => {
+  const res: any = {};
+  const attrs = model?.attributes || {};
+  Object.keys(attrs).forEach((key) => {
+    res[key] = snapshotValue(attrs[key]);
+  });
+  return res;
+};
+
+const snapshotValue = (value: any): any => {
+  if (value == null) return value;
+  if ((value as any).models) {
+    return (value as any).models.map((m: any) => snapshotModel(m));
+  }
+  if ((value as any).attributes) {
+    return snapshotModel(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => snapshotValue(item));
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return value;
+    }
+  }
+  return value;
+};
+
+const escapeJsonPointer = (segment: string) => segment.replace(/~/g, '~0').replace(/\//g, '~1');
+
+const toPointer = (path: (string | number)[]) => path.map((seg) => escapeJsonPointer(String(seg))).join('/');
+
+const getEditor = (model: any) => {
+  try {
+    return model?._module?.em || model?.em;
+  } catch {
+    return undefined;
+  }
+};
+
+const getPatchManager = (model: any) => getEditor(model)?.Patches;
+
+export default class ModelWithPatches<T extends Backbone.ObjectHash = any, S = any, E = any> extends Backbone.Model<
+  T,
+  S,
+  E
+> {
   patchObjectType = '';
   patchTrackedKeys?: string[];
   patchIgnoredKeys?: string[];
 
   set(key: any, val?: any, opts?: any) {
-    const { em } = this as any;
-    const P = em?.Patches;
-
     const props = typeof key === 'string' ? { [key]: val } : key;
-    const options = typeof key === 'string' ? opts || {} : val || {};
+    const options = (typeof key === 'string' ? opts : val) || {};
+    const em = getEditor(this as any);
+    const P = getPatchManager(this);
+    const editorSkip = !!(em && (em as any).__skip);
 
     if (
-      !P?.isEnabled ||
-      (P as any)['isApplyingExternal'] ||
+      !P?.canTrack?.() ||
+      editorSkip ||
+      !this.patchObjectType ||
       options.fromUndo ||
       options.noUndo ||
       options.avoidStore ||
-      options._skipPatches
+      options._skipPatches ||
+      options.partial ||
+      options.temporary
     ) {
       return super.set(props, options);
     }
@@ -63,69 +121,67 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = any> exten
       return super.set(props, options);
     }
 
-    const before: any = {};
-    let jsonBefore: any;
-
-    try {
-      jsonBefore = this.toJSON();
-    } catch {
-      jsonBefore = this.attributes;
+    const before = snapshotModel(this);
+    const result = super.set(props, options);
+    const after = snapshotModel(this);
+    const basePath = this.getPatchBasePath();
+    if (!basePath) {
+      return result;
     }
 
-    keys.forEach((k) => {
-      before[k] = jsonBefore ? jsonBefore[k] : undefined;
-    });
+    const tuple = produceWithPatches(before, (draft: any) => {
+      Object.keys(draft).forEach((key) => {
+        if (!(key in after)) {
+          delete draft[key];
+        }
+      });
+      Object.keys(after).forEach((key) => {
+        draft[key] = after[key];
+      });
+    }) as unknown as [any, ImmerPatch[], ImmerPatch[]];
+    const [, nextPatches, inversePatches] = tuple;
+    const changes = this.toJsonPatches(nextPatches, basePath, keys);
+    const reverseChanges = this.toJsonPatches(inversePatches, basePath, keys);
 
-    super.set(props, options);
-
-    const after: any = {};
-    let jsonAfter: any;
-
-    try {
-      jsonAfter = this.toJSON();
-    } catch {
-      jsonAfter = this.attributes;
+    if (changes.length && reverseChanges.length) {
+      P.collect(changes, reverseChanges);
     }
 
-    keys.forEach((k) => {
-      after[k] = jsonAfter ? jsonAfter[k] : undefined;
-    });
+    return result;
+  }
 
-    const rawPatches = diffObjects(before, after);
-    if (!rawPatches.length) return this;
-
-    const id = this.id ?? this.cid;
+  private getPatchBasePath() {
     const type = this.patchObjectType;
-    if (!type || !id) return this;
+    const id = (this as any).getId?.() ?? this.id ?? (this as any).cid;
+    return type && id ? `/${type}/${id}` : '';
+  }
 
-    const forward: JsonPatch[] = [];
-    const reverse: JsonPatch[] = [];
+  private toJsonPatches(list: ImmerPatch[], basePath: string, allowedKeys: string[]): JsonPatch[] {
+    const allowed = new Set(allowedKeys);
+    const mapped: JsonPatch[] = [];
 
-    for (const p of rawPatches) {
-      if (isBlacklistedPath(p.path)) continue;
-      if ((p.op === 'add' || p.op === 'replace') && typeof (p as any).value === 'undefined') continue;
+    list.forEach((patch) => {
+      const pathArr = patch.path || [];
+      const relativePath = pathArr.length ? `/${toPointer(pathArr)}` : '';
+      const rootKey = pathArr.length ? String(pathArr[0]) : '';
 
-      const prefixed: JsonPatch = { ...p, path: `/${type}/${id}${p.path}` };
-      forward.push(prefixed);
+      if (rootKey && !allowed.has(rootKey)) return;
+      if (isBlacklistedPath(relativePath)) return;
 
-      const prevVal = getPrevValue(before, p.path);
-
-      switch (p.op) {
+      const path = `${basePath}${relativePath}`;
+      switch (patch.op) {
         case 'add':
-          reverse.unshift({ op: 'remove', path: prefixed.path });
-          break;
-        case 'remove':
-          reverse.unshift({ op: 'add', path: prefixed.path, value: prevVal });
+          mapped.push({ op: 'add', path, value: patch.value });
           break;
         case 'replace':
-          reverse.unshift({ op: 'replace', path: prefixed.path, value: prevVal });
+          mapped.push({ op: 'replace', path, value: patch.value });
+          break;
+        case 'remove':
+          mapped.push({ op: 'remove', path });
           break;
       }
-    }
+    });
 
-    if (!forward.length || !reverse.length) return this;
-
-    P.collect(forward, reverse);
-    return this;
+    return mapped;
   }
 }
