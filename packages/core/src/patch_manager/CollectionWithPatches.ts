@@ -99,12 +99,32 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
     return this.getOrderedModels();
   }
 
+  getFractionalKey(id: string): string | undefined {
+    const map = this.ensureFractionalMap();
+    return map[id];
+  }
+
+  setFractionalKey(id: string, key: string): void {
+    const map = this.ensureFractionalMap();
+    map[id] = key;
+  }
+
+  removeFractionalKey(id: string): void {
+    const map = this.ensureFractionalMap();
+    delete map[id];
+  }
+
+  setFractionalMap(map: FractionalMap = {}): void {
+    this.fractionalMap = { ...map };
+  }
+
   add(models: T | T[], opts: AddOptions = {}): any {
     const incoming = toArray(models);
+    const external = (opts as any).external;
     let beforeKey: string | null | undefined;
     let afterKey: string | null | undefined;
 
-    if (incoming.length) {
+    if (incoming.length && !external) {
       const ordered = this.getOrderedModels();
       const map = this.ensureFractionalMap(ordered);
       const insertAt = normalizeAt(opts.at, ordered.length);
@@ -119,15 +139,17 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
     if (!added.length) return result;
 
     const map = this.ensureFractionalMap();
-    const keys = generateNKeysBetween(beforeKey ?? null, afterKey ?? null, added.length);
+    const keys = external ? [] : generateNKeysBetween(beforeKey ?? null, afterKey ?? null, added.length);
     const orderPath = this.getOrderPath();
     const pm = this.patchManager;
-    const activePatch = pm && orderPath ? pm.createOrGetCurrentPatch() : undefined;
+    const activePatch = !external && pm && orderPath ? pm.createOrGetCurrentPatch() : undefined;
 
     added.forEach((model, index) => {
       const id = this.getModelId(model);
-      const key = keys[index];
-      if (!id || !key) return;
+      if (!id) return;
+      const existingKey = map[id];
+      const key = existingKey || keys[index];
+      if (!key) return;
       map[id] = key;
 
       if (activePatch) {
@@ -141,6 +163,7 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
 
   remove(models: T | T[], opts: RemoveOptions = {}): any {
     const incoming = toArray(models);
+    const external = (opts as any).external;
     this.ensureFractionalMap();
 
     const toRemove = incoming
@@ -165,7 +188,7 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
 
     const orderPath = this.getOrderPath();
     const pm = this.patchManager;
-    const activePatch = pm && orderPath ? pm.createOrGetCurrentPatch() : undefined;
+    const activePatch = !external && pm && orderPath ? pm.createOrGetCurrentPatch() : undefined;
 
     if (activePatch) {
       removalData.forEach((entry) => {
@@ -179,6 +202,7 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
   }
 
   reset(models?: T[], opts: any = {}): this {
+    const external = (opts as any).external;
     const prevMap = this.fractionalMap ? { ...this.fractionalMap } : {};
     const result = super.reset(models as any, opts as any);
 
@@ -188,7 +212,7 @@ export default class CollectionWithPatches<T extends Model = Model> extends Coll
     const orderPath = this.getOrderPath();
     const pm = this.patchManager;
 
-    if (pm && orderPath && !mapsEqual(prevMap, nextMap)) {
+    if (!external && pm && orderPath && !mapsEqual(prevMap, nextMap)) {
       const patch = pm.createOrGetCurrentPatch();
       const change: PatchChangeProps = { op: 'replace', path: orderPath, value: nextMap };
       const reverseChange: PatchChangeProps = { op: 'replace', path: orderPath, value: prevMap };

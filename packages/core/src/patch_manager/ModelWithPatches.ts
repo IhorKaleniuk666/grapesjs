@@ -67,6 +67,10 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = SetOptions
       this.em = (opts as any).em;
     }
 
+    if ((opts as any)?.external) {
+      return (super.set as any).apply(this, args);
+    }
+
     const pm = this.patchManager;
     const attrId = (attrs as any)?.id;
     let objectId = this.getPatchObjectId();

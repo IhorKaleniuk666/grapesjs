@@ -46,6 +46,8 @@ import DataSourceManager from '../../data_sources';
 import { ComponentsEvents } from '../../dom_components/types';
 import { InitEditorConfig } from '../..';
 import { EditorEvents, SelectComponentOptions } from '../types';
+import PatchManager from '../../patch_manager';
+import { applyEditorPatches } from '../../patch_manager/apply';
 
 Backbone.$ = $;
 
@@ -178,6 +180,10 @@ export default class EditorModel extends Model {
     return this.get('UndoManager');
   }
 
+  get Patches(): PatchManager | undefined {
+    return this.get('Patches');
+  }
+
   get RichTextEditor(): RichTextEditorModule {
     return this.get('RichTextEditor');
   }
@@ -269,6 +275,16 @@ export default class EditorModel extends Model {
           {} as Record<string, any>,
         )
       : '';
+
+    const patchesConfig = config.patches || {};
+    this.set(
+      'Patches',
+      new PatchManager({
+        enabled: !!patchesConfig.enable,
+        emitter: this,
+        applyPatch: (changes, options) => applyEditorPatches(this, changes, options),
+      }),
+    );
 
     // Move components to pages
     if (config.components && !config.pageManager) {

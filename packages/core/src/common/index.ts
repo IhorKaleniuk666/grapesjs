@@ -12,9 +12,10 @@ export type SetOptions = Backbone.ModelSetOptions & {
   avoidStore?: boolean;
   avoidTransformers?: boolean;
   partial?: boolean;
+  external?: boolean;
 };
 
-export type AddOptions = Backbone.AddOptions & { temporary?: boolean; action?: string };
+export type AddOptions = Backbone.AddOptions & { temporary?: boolean; action?: string; external?: boolean };
 
 export type DisableOptions = { fromMove?: boolean };
 
@@ -24,7 +25,8 @@ export type UndoOptions = { fromUndo?: boolean };
 
 export type WithHTMLParserOptions = { parserOptions?: HTMLParserOptions };
 
-export type RemoveOptions = Backbone.Silenceable & UndoOptions & { dangerously?: boolean; temporary?: boolean };
+export type RemoveOptions = Backbone.Silenceable &
+  UndoOptions & { dangerously?: boolean; temporary?: boolean; external?: boolean };
 
 export type EventHandler = Backbone.EventHandler;
 
