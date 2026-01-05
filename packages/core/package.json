@@ -30,13 +30,14 @@
     "url": "https://github.com/GrapesJS/grapesjs.git"
   },
   "dependencies": {
-    "immer": "^10.1.1",
     "@types/backbone": "1.4.15",
     "backbone": "1.4.1",
     "backbone-undo": "0.2.6",
     "codemirror": "5.63.0",
     "codemirror-formatting": "1.0.0",
+    "fractional-indexing": "^3.2.0",
     "html-entities": "~1.4.0",
+    "immer": "^10.1.1",
     "promise-polyfill": "8.3.0",
     "underscore": "1.13.1"
   },

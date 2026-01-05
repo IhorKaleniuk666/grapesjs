@@ -149,7 +149,14 @@ export default class AssetsView extends View {
     } else {
       const assetsEl = this.getAssetsEl();
       if (assetsEl) {
-        assetsEl.insertBefore(rendered, assetsEl.firstChild);
+        if (this.shouldUseFractionalOrder()) {
+          const ordered = this.getOrderedAssets();
+          const index = ordered.indexOf(model);
+          const refNode = index >= 0 ? assetsEl.children[index] || null : assetsEl.firstChild;
+          assetsEl.insertBefore(rendered, refNode || null);
+        } else {
+          assetsEl.insertBefore(rendered, assetsEl.firstChild);
+        }
       }
     }
 
@@ -181,12 +188,30 @@ export default class AssetsView extends View {
     this.$el.find(`.${pfx}highlight`).removeClass(`${pfx}highlight`);
   }
 
+  shouldUseFractionalOrder() {
+    const globalCollection = this.options.globalCollection as any;
+    return (
+      !!globalCollection?.em?.Patches?.isEnabled && typeof globalCollection.getAndSortFractionalMap === 'function'
+    );
+  }
+
+  getOrderedAssets(): Asset[] {
+    if (!this.shouldUseFractionalOrder()) {
+      return this.collection.models;
+    }
+
+    const globalCollection = this.options.globalCollection as any;
+    const ordered = globalCollection.getAndSortFractionalMap() as Asset[];
+    const visible = new Set(this.collection.models);
+    return ordered.filter((model) => visible.has(model));
+  }
+
   renderAssets() {
     const fragment = document.createDocumentFragment();
     const assets = this.$el.find(`.${this.pfx}assets`);
     assets.empty();
     this.toggleNoAssets(!!this.collection.length);
-    this.collection.each((model) => this.addAsset(model, fragment));
+    this.getOrderedAssets().forEach((model) => this.addAsset(model, fragment));
     assets.append(fragment);
   }
 

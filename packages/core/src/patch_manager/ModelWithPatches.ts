@@ -61,14 +61,23 @@ export default class ModelWithPatches<T extends ObjectHash = any, S = SetOptions
   }
 
   set(...args: any[]): this {
+    const { attrs, opts } = normalizeSetArgs<T>(args);
+
+    if (!this.em && (opts as any)?.em) {
+      this.em = (opts as any).em;
+    }
+
     const pm = this.patchManager;
-    const objectId = this.getPatchObjectId();
+    const attrId = (attrs as any)?.id;
+    let objectId = this.getPatchObjectId();
+
+    if ((objectId == null || objectId === (this as any).cid) && attrId != null && attrId !== '') {
+      objectId = attrId;
+    }
 
     if (!pm || !objectId) {
       return (super.set as any).apply(this, args);
     }
-
-    const { attrs, opts } = normalizeSetArgs<T>(args);
     const beforeState = serialize(this.attributes || {});
     const result = super.set(attrs as any, opts as any);
     const afterState = serialize(this.attributes || {});

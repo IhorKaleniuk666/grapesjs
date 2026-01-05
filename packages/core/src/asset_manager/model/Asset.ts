@@ -1,5 +1,6 @@
 import { result } from 'underscore';
-import { Model } from '../../common';
+import { createId } from '../../utils/mixins';
+import ModelWithPatches from '../../patch_manager/ModelWithPatches';
 
 /**
  * @property {String} type Asset type, eg. `'image'`.
@@ -7,7 +8,18 @@ import { Model } from '../../common';
  *
  * @module docsjs.Asset
  */
-export default class Asset extends Model {
+export default class Asset extends ModelWithPatches {
+  constructor(attributes: any = {}, opts: { em?: any } = {}) {
+    const em = (opts as any).em;
+    let attrs = attributes;
+
+    if (em?.Patches?.isEnabled && attrs && typeof attrs === 'object' && !('id' in attrs)) {
+      attrs = { ...attrs, id: createId() };
+    }
+
+    super(attrs as any, opts as any);
+  }
+
   static getDefaults() {
     return result(this.prototype, 'defaults');
   }
@@ -66,6 +78,11 @@ export default class Asset extends Model {
   getExtension() {
     return this.getFilename().split('.').pop();
   }
+
+  protected getPatchObjectId(): string | number | undefined {
+    return this.get('id') || super.getPatchObjectId();
+  }
 }
 
 Asset.prototype.idAttribute = 'src';
+Asset.prototype.patchObjectType = 'asset';

@@ -34,6 +34,7 @@ export interface AssetsCustomData {
 }
 
 export interface AssetProps {
+  id?: string;
   src: string;
   [key: string]: unknown;
 }

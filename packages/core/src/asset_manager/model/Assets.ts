@@ -1,12 +1,15 @@
-import { Collection } from '../../common';
 import Asset from './Asset';
 import AssetImage from './AssetImage';
 import AssetImageView from '../view/AssetImageView';
 import TypeableCollection from '../../domain_abstract/model/TypeableCollection';
+import CollectionWithPatches from '../../patch_manager/CollectionWithPatches';
 
-const TypeableCollectionExt = Collection.extend(TypeableCollection);
+const TypeableCollectionExt = (CollectionWithPatches as any).extend(TypeableCollection);
 
 export default class Assets extends TypeableCollectionExt<Asset> {}
+
+Assets.prototype.patchObjectType = 'assets';
+Assets.prototype.patchObjectId = 'global';
 
 Assets.prototype.types = [
   {
